@@ -2103,422 +2103,419 @@ function buildAIPayload(
    PÁGINA DE IA
 ========================================================= */
 
-function AIPage({
-  messages,
-  users,
-  stats,
-  rawChat,
-}) {
-  const [loading, setLoading] =
-    useState(false);
+function AIReport({ report, onSave, onClear }) {
+  if (!report) return null;
 
-  const [result, setResult] =
-    useState("");
+  const Section = ({ icon, title, children, tone = "" }) => (
+    <section className={`ai-report-section ${tone}`}>
+      <div className="ai-section-title">
+        <span className="ai-section-icon">{icon}</span>
+        <h3>{title}</h3>
+      </div>
+      <div className="ai-section-body">{children}</div>
+    </section>
+  );
 
-  const [error, setError] =
-    useState("");
+  const List = ({ items = [], className = "" }) => (
+    <ul className={`ai-list ${className}`}>
+      {items.filter(Boolean).map((item, index) => (
+        <li key={`${index}-${String(item).slice(0, 20)}`}>{item}</li>
+      ))}
+    </ul>
+  );
 
+  const people = Array.isArray(report.participants) ? report.participants : [];
+
+  return (
+    <article className="ai-report">
+      <div className="ai-report-top">
+        <div>
+          <span className="ai-report-kicker">AI RELATIONSHIP REPORT</span>
+          <h2>Lectura de la conversación</h2>
+          <p>
+            Interpretación de Gemini basada en las estadísticas locales y en el
+            contenido disponible del chat.
+          </p>
+        </div>
+        <div className="ai-report-actions">
+          <button className="ai-save-button" onClick={onSave}>
+            💾 Guardar análisis
+          </button>
+          <button className="ai-clear-button" onClick={onClear}>
+            Limpiar
+          </button>
+        </div>
+      </div>
+
+      <div className="ai-score-grid">
+        <div className="ai-score-card featured">
+          <span>Interés / implicación</span>
+          <strong>{Number.isFinite(Number(report.interest_score)) ? `${report.interest_score}/100` : "—"}</strong>
+          <div className="score-track">
+            <i style={{ width: `${Math.max(0, Math.min(100, Number(report.interest_score) || 0))}%` }} />
+          </div>
+          <small>{report.interest_label || "Sin valoración suficiente"}</small>
+        </div>
+        <div className="ai-score-card">
+          <span>Reciprocidad</span>
+          <strong>{Number.isFinite(Number(report.reciprocity_score)) ? `${report.reciprocity_score}/100` : "—"}</strong>
+          <small>{report.reciprocity_label || "Datos insuficientes"}</small>
+        </div>
+        <div className="ai-score-card">
+          <span>Comunicación</span>
+          <strong>{Number.isFinite(Number(report.communication_score)) ? `${report.communication_score}/100` : "—"}</strong>
+          <small>{report.communication_label || "Datos insuficientes"}</small>
+        </div>
+      </div>
+
+      <Section icon="🧠" title="Resumen general">
+        <p className="ai-lead">{report.summary || "La IA no proporcionó un resumen."}</p>
+        {report.key_observations?.length ? (
+          <List items={report.key_observations} className="check-list" />
+        ) : null}
+      </Section>
+
+      <div className="ai-two-column">
+        {people.map((person, index) => (
+          <Section key={index} icon="👤" title={person.name || `Participante ${index + 1}`}>
+            <p>{person.summary || "Sin resumen disponible."}</p>
+            {person.strengths?.length ? (
+              <>
+                <h4>Lo que destaca</h4>
+                <List items={person.strengths} className="check-list" />
+              </>
+            ) : null}
+            {person.behaviors?.length ? (
+              <>
+                <h4>Patrones observables</h4>
+                <List items={person.behaviors} />
+              </>
+            ) : null}
+          </Section>
+        ))}
+      </div>
+
+      <Section icon="💬" title="Dinámica entre ambos">
+        <p>{report.dynamic || "No hay datos suficientes para describir la dinámica."}</p>
+        {report.communication?.length ? <List items={report.communication} /> : null}
+      </Section>
+
+      <div className="ai-two-column">
+        <Section icon="🚩" title="Red flags" tone="danger">
+          {report.red_flags?.length ? (
+            <div className="ai-alert-list">
+              {report.red_flags.map((item, index) => (
+                <div className="ai-alert-card" key={index}>
+                  <span>!</span><p>{item}</p>
+                </div>
+              ))}
+            </div>
+          ) : <p className="ai-positive">No se han detectado señales claras con los datos disponibles.</p>}
+        </Section>
+
+        <Section icon="💚" title="Green flags" tone="positive">
+          {report.green_flags?.length ? (
+            <List items={report.green_flags} className="check-list" />
+          ) : <p>No se han encontrado señales claras suficientes.</p>}
+        </Section>
+      </div>
+
+      <Section icon="🔗" title="Posibles patrones de apego">
+        <p>{report.attachment || "No hay suficiente información para formular una hipótesis responsable."}</p>
+        <small className="ai-disclaimer">
+          Esto no es un diagnóstico psicológico. Son patrones conversacionales que podrían ser compatibles con determinadas formas de relacionarse.
+        </small>
+      </Section>
+
+      <Section icon="🎯" title="Conclusión">
+        <p className="ai-conclusion">{report.conclusion || "No se pudo generar una conclusión."}</p>
+      </Section>
+
+      {report.evidence?.length ? (
+        <Section icon="🔎" title="Qué datos apoyan la interpretación">
+          <List items={report.evidence} />
+        </Section>
+      ) : null}
+    </article>
+  );
+}
+
+
+function parseAIResponse(text) {
+  const raw = String(text || "").trim();
+
+  // Gemini puede envolver JSON en ```json ... ```
+  const cleaned = raw
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (parsed && typeof parsed === "object") return parsed;
+  } catch {}
+
+  // Compatibilidad con respuestas antiguas de texto.
+  return {
+    summary: raw,
+    key_observations: [],
+    participants: [],
+    dynamic: "",
+    interest_score: null,
+    interest_label: "",
+    reciprocity_score: null,
+    reciprocity_label: "",
+    communication_score: null,
+    communication_label: "",
+    communication: [],
+    red_flags: [],
+    green_flags: [],
+    attachment: "",
+    conclusion: raw,
+    evidence: [],
+    legacy_text: true,
+  };
+}
+
+
+
+function simpleHash(text = "") {
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function AIPage({ messages, users, stats, rawChat }) {
+  const [loading, setLoading] = useState(false);
+  const storageKey = `wtsanalyzer_ai_report_${simpleHash(rawChat)}`;
+  const [report, setReport] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`wtsanalyzer_ai_report_${simpleHash(rawChat)}`);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [error, setError] = useState("");
 
   const analyze = async () => {
     setLoading(true);
-    setResult("");
+    setReport(null);
     setError("");
 
-
     try {
-      const statistics =
-        buildAIPayload(
-          messages,
-          users,
-          stats
-        );
-
-
-      const userList =
-        users.length
-          ? users.join(
-              " y "
-            )
-          : "los participantes";
-
+      const statistics = buildAIPayload(messages, users, stats);
+      const userList = users.length ? users.join(" y ") : "los participantes";
 
       const prompt = `
-Analiza la siguiente conversación de WhatsApp.
+Analiza esta conversación de WhatsApp de forma seria, directa y responsable.
 
 Participantes: ${userList}
 
-Quiero un análisis serio, directo y basado en los datos.
+DEVUELVE ÚNICAMENTE JSON VÁLIDO. No uses Markdown, no uses bloques de código y no escribas texto fuera del JSON.
 
-Organiza la respuesta utilizando estas secciones:
+Usa exactamente esta estructura:
+{
+  "summary": "resumen general breve",
+  "key_observations": ["observación 1", "observación 2"],
+  "participants": [
+    {
+      "name": "nombre exacto",
+      "summary": "resumen de su forma de comunicarse",
+      "strengths": ["fortaleza observable"],
+      "behaviors": ["patrón observable"]
+    }
+  ],
+  "dynamic": "análisis de la dinámica entre ambos",
+  "interest_score": 0,
+  "interest_label": "bajo / medio / alto / insuficiente",
+  "reciprocity_score": 0,
+  "reciprocity_label": "baja / media / alta / insuficiente",
+  "communication_score": 0,
+  "communication_label": "difícil / irregular / buena / muy buena / insuficiente",
+  "communication": ["patrón de comunicación 1"],
+  "red_flags": ["señal observable o explicación prudente"],
+  "green_flags": ["señal positiva observable"],
+  "attachment": "hipótesis muy prudente sobre patrones de apego, o insuficiente",
+  "conclusion": "conclusión clara y equilibrada",
+  "evidence": ["dato o patrón concreto que apoya una interpretación"]
+}
 
-1. RESUMEN GENERAL
-2. ANÁLISIS DE CADA PARTICIPANTE
-3. DINÁMICA ENTRE AMBOS
-4. NIVEL DE INTERÉS
-5. COMUNICACIÓN
-6. RED FLAGS
-7. GREEN FLAGS
-8. POSIBLES PATRONES DE APEGO
-9. CONCLUSIÓN
+Los scores de 0 a 100 son estimaciones interpretativas, NO estadísticas. Si no hay datos suficientes usa null y "insuficiente". No conviertas cantidad de mensajes, rapidez de respuesta o lenguaje cariñoso en una prueba automática de interés o amor.
 
-Para cada interpretación importante explica qué datos la apoyan.
-
-REGLAS IMPORTANTES:
-
+REGLAS:
 - No diagnostiques trastornos psicológicos.
-- No afirmes un estilo de apego como un hecho.
-- Utiliza expresiones como "podría indicar" o "es compatible con".
-- Diferencia claramente entre datos objetivos e interpretación.
-- No inventes información.
-- No confundas cantidad de mensajes con interés romántico automáticamente.
-- No confundas rapidez de respuesta con interés automáticamente.
-- No confundas lenguaje afectivo con amor.
-- Si no existen suficientes datos para una conclusión, dilo.
+- No afirmes estilos de apego como hechos.
+- Distingue datos objetivos de interpretación.
+- No inventes mensajes, hechos ni contexto.
+- Sé honesto si la evidencia es insuficiente.
+- Las red flags deben describir conductas observables, no etiquetar personas.
+- Las green flags también deben estar respaldadas por el chat.
 - No juzgues moralmente a los participantes.
-- Sé honesto incluso cuando la conclusión sea negativa.
+- Analiza el contenido completo disponible; si no cabe íntegramente, dilo en summary y no afirmes haber analizado el 100%.
 
 ESTADÍSTICAS CALCULADAS LOCALMENTE:
+${JSON.stringify(statistics, null, 2)}
 
-${JSON.stringify(
-  statistics,
-  null,
-  2
-)}
-
-============================================================
-TRANSCRIPCIÓN COMPLETA DEL ARCHIVO TXT ORIGINAL
-============================================================
-
-Analiza también el contenido íntegro de esta transcripción. No te limites a las estadísticas: revisa mensajes individuales, contexto, secuencia temporal, cambios de tono, conversaciones largas y cortas, reciprocidad, temas, conflictos, reconciliaciones, muestras de afecto, silencios y cualquier patrón que pueda observarse.
-
-IMPORTANTE: esta es la transcripción completa disponible para este análisis. No inventes mensajes que no aparezcan aquí. Si el archivo resulta demasiado grande para procesarlo íntegramente, indícalo explícitamente y trabaja con la mayor cantidad de contenido posible sin afirmar que has analizado el 100%.
-
---- INICIO DEL TXT ---
+TRANSCRIPCIÓN COMPLETA:
+--- INICIO ---
 ${rawChat}
---- FIN DEL TXT ---
+--- FIN ---
 `;
 
+      const response = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
 
-      const response =
-        await fetch(
-          "/api/ai",
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body: JSON.stringify({
-              prompt,
-            }),
-          }
-        );
-
-
-      const raw =
-        await response.text();
-
-
+      const raw = await response.text();
       let data;
-
       try {
-        data =
-          JSON.parse(raw);
+        data = JSON.parse(raw);
       } catch {
-        throw new Error(
-          `El servidor devolvió una respuesta no válida (HTTP ${response.status}).`
-        );
+        throw new Error(`El servidor devolvió una respuesta no válida (HTTP ${response.status}).`);
       }
 
-
-      if (
-        !response.ok ||
-        !data.success
-      ) {
-        throw new Error(
-          data.error ||
-            "Error desconocido del servidor de IA."
-        );
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Error desconocido del servidor de IA.");
       }
 
-
-      setResult(
-        data.text ||
-          "La IA no devolvió ningún texto."
-      );
-
+      const parsed = parseAIResponse(data.text);
+      setReport(parsed);
+      localStorage.setItem(storageKey, JSON.stringify(parsed));
     } catch (err) {
-
-      setError(
-        err?.message ||
-          "No se pudo realizar el análisis."
-      );
-
+      setError(err?.message || "No se pudo realizar el análisis.");
     } finally {
-
       setLoading(false);
-
     }
   };
 
+  const saveReport = () => {
+    if (!report) return;
+    const text = [
+      "WHATSAPP ANALYZER — INFORME IA",
+      "",
+      report.summary || "",
+      "",
+      ...(report.participants || []).flatMap((p) => [
+        `PARTICIPANTE: ${p.name || ""}`,
+        p.summary || "",
+        ...(p.strengths || []).map((x) => `• ${x}`),
+        ...(p.behaviors || []).map((x) => `• ${x}`),
+        "",
+      ]),
+      `INTERÉS: ${report.interest_score ?? "—"}/100 — ${report.interest_label || ""}`,
+      `RECIPROCIDAD: ${report.reciprocity_score ?? "—"}/100 — ${report.reciprocity_label || ""}`,
+      `COMUNICACIÓN: ${report.communication_score ?? "—"}/100 — ${report.communication_label || ""}`,
+      "",
+      `DINÁMICA: ${report.dynamic || ""}`,
+      "",
+      "RED FLAGS",
+      ...(report.red_flags || []).map((x) => `• ${x}`),
+      "",
+      "GREEN FLAGS",
+      ...(report.green_flags || []).map((x) => `• ${x}`),
+      "",
+      "POSIBLES PATRONES DE APEGO",
+      report.attachment || "",
+      "",
+      "CONCLUSIÓN",
+      report.conclusion || "",
+    ].join("\n");
+
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `whatsapp-analyzer-informe-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const clearReport = () => {
+    setReport(null);
+    localStorage.removeItem(storageKey);
+  };
 
   return (
-    <main>
-
-      <div className="hero ai-hero">
-
+    <main className="ai-page">
+      <div className="ai-hero">
         <div>
-
-          <span className="eyebrow">
-            INTELIGENCIA ARTIFICIAL
-          </span>
-
-          <h1>
-            Ahora vamos
-            <br />
-            más allá de los números.
-          </h1>
-
+          <span className="eyebrow">INTELIGENCIA ARTIFICIAL</span>
+          <h1>Ahora vamos<br />más allá de los números.</h1>
           <p>
-            Gemini analiza los patrones obtenidos
-            de la conversación y los convierte en
-            una interpretación estructurada.
+            Gemini transforma los patrones de tu conversación en un informe visual,
+            manteniendo separadas las estadísticas de las interpretaciones.
           </p>
-
         </div>
-
-
-        <div className="ai-status">
-
-          <Sparkles size={18} />
-
-          <span>
-            Gemini · servidor seguro
-          </span>
-
-        </div>
-
+        <div className="ai-status"><Sparkles size={18} /><span>Gemini · servidor seguro</span></div>
       </div>
 
-
-      <section className="panel ai-panel">
-
-        <div className="ai-panel-heading">
-
-          <div className="ai-icon">
-            <Sparkles size={24} />
-          </div>
-
-          <div>
-
-            <h3>
-              Análisis inteligente
-            </h3>
-
-            <p>
-              La API key permanece en el
-              servidor y no se expone al
-              navegador.
-            </p>
-
-          </div>
-
-        </div>
-
-
-        <div className="ai-grid">
-
-          <div>
-            <b>
-              🧠 Comunicación
-            </b>
-
-            <span>
-              Cómo se expresa cada
-              participante.
-            </span>
-          </div>
-
-          <div>
-            <b>
-              ❤️ Interés
-            </b>
-
-            <span>
-              Patrones de implicación
-              conversacional.
-            </span>
-          </div>
-
-          <div>
-            <b>
-              🚩 Red flags
-            </b>
-
-            <span>
-              Señales observables,
-              no diagnósticos.
-            </span>
-          </div>
-
-          <div>
-            <b>
-              🔗 Apego
-            </b>
-
-            <span>
-              Patrones compatibles,
-              no diagnósticos.
-            </span>
-          </div>
-
-        </div>
-
-
-        <button
-          className="ai-button"
-          onClick={analyze}
-          disabled={
-            loading ||
-            !messages.length
-          }
-        >
-
-          {loading ? (
-            <>
-              <Sparkles size={17} />
-              Analizando conversación...
-            </>
-          ) : (
-            <>
-              <Sparkles size={17} />
-              Analizar conversación
-            </>
-          )}
-
-        </button>
-
-
-        {error && (
-          <div className="warning">
-
-            <AlertTriangle
-              size={18}
-            />
-
+      {!report && (
+        <section className="panel ai-panel ai-start-panel">
+          <div className="ai-panel-heading">
+            <div className="ai-icon"><Sparkles size={24} /></div>
             <div>
-
-              <strong>
-                No se pudo realizar
-                el análisis
-              </strong>
-
-              <p>
-                {error}
-              </p>
-
-              <small>
-                Comprueba que el servidor
-                esté ejecutándose y que la
-                API esté configurada
-                correctamente.
-              </small>
-
+              <h3>Análisis inteligente</h3>
+              <p>La API key permanece en el servidor y no se expone al navegador.</p>
             </div>
-
           </div>
-        )}
 
+          <div className="ai-grid">
+            <div><b>🧠 Comunicación</b><span>Cómo se expresa cada participante.</span></div>
+            <div><b>❤️ Interés</b><span>Patrones de implicación conversacional.</span></div>
+            <div><b>🚩 Red flags</b><span>Señales observables, no diagnósticos.</span></div>
+            <div><b>🔗 Apego</b><span>Hipótesis prudentes, no diagnósticos.</span></div>
+          </div>
 
-        {result && (
-          <article className="ai-result">
+          <button className="ai-main-button" onClick={analyze} disabled={loading || !messages.length}>
+            <Sparkles size={17} />
+            {loading ? "Analizando conversación..." : "Analizar conversación"}
+          </button>
+        </section>
+      )}
 
-            <div className="ai-result-header">
-
-              <Sparkles size={20} />
-
-              <div>
-
-                <strong>
-                  Análisis completado
-                </strong>
-
-                <span>
-                  Generado mediante Gemini
-                </span>
-
-              </div>
-
-            </div>
-
-
-            <div className="ai-result-text">
-              {result}
-            </div>
-
-          </article>
-        )}
-
-      </section>
-
-
-      <section className="panel">
-
-        <h3>
-          ¿Qué información recibe la IA?
-        </h3>
-
-        <p className="chart-desc">
-          La aplicación calcula primero las
-          estadísticas localmente. Después envía
-          a la IA un perfil estructurado con
-          métricas de los participantes,
-          actividad, vocabulario y otros
-          indicadores.
-        </p>
-
-
-        <div className="privacy-grid">
-
+      {loading && (
+        <section className="panel ai-loading-card">
+          <div className="ai-loader"><Sparkles size={24} /></div>
           <div>
-            <b>
-              📊 Estadísticas
-            </b>
-
-            <span>
-              Mensajes, palabras, emojis,
-              respuestas y actividad.
-            </span>
+            <strong>Analizando tu conversación…</strong>
+            <p>Estamos leyendo patrones, contexto y estadísticas. Esto puede tardar unos segundos.</p>
           </div>
+        </section>
+      )}
 
+      {error && (
+        <div className="warning">
+          <AlertTriangle size={18} />
           <div>
-            <b>
-              👥 Comparación
-            </b>
-
-            <span>
-              Diferencias entre los
-              participantes.
-            </span>
+            <strong>No se pudo realizar el análisis</strong>
+            <p>{error}</p>
           </div>
-
-          <div>
-            <b>
-              🔒 API protegida
-            </b>
-
-            <span>
-              La clave permanece en el
-              servidor.
-            </span>
-          </div>
-
         </div>
+      )}
 
+      {report && !loading && (
+        <AIReport report={report} onSave={saveReport} onClear={clearReport} />
+      )}
+
+      <section className="panel privacy-panel">
+        <h3>Privacidad del análisis</h3>
+        <p className="chart-desc">
+          Las estadísticas se calculan localmente. Para el modo IA, el TXT y las métricas
+          se envían al servidor para generar la interpretación. La clave de Gemini nunca
+          se envía al navegador.
+        </p>
+        <div className="privacy-grid">
+          <div><b>📊 Estadísticas locales</b><span>El análisis básico ocurre en tu dispositivo.</span></div>
+          <div><b>🤖 IA</b><span>El contenido necesario se envía a Gemini mediante el Worker.</span></div>
+          <div><b>💾 Guardado</b><span>El informe se guarda en este dispositivo y también puede descargarse como TXT.</span></div>
+        </div>
       </section>
-
     </main>
   );
 }

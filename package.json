@@ -8,8 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "server": "node server.cjs",
-    "cf:dev": "npm run build && npx wrangler@latest pages dev dist",
-    "cf:deploy": "npm run build && npx wrangler@latest pages deploy"
+    "cf:dev": "npm run build && npx wrangler@latest dev",
+    "cf:deploy": "npm run build && npx wrangler@latest deploy"
   },
   "dependencies": {
     "@google/genai": "^2.20.0",
