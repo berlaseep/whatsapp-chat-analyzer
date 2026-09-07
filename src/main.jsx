@@ -14,6 +14,13 @@ import {
   CalendarDays,
   Zap,
   AlertTriangle,
+  MessageSquareText,
+  Hash,
+  Heart,
+  FileText,
+  Menu,
+  Settings,
+  Database,
 } from "lucide-react";
 
 import "./styles.css";
@@ -809,9 +816,10 @@ function SectionTitle({
   icon: Icon,
   title,
   description,
+  id,
 }) {
   return (
-    <div className="section-title">
+    <div className="section-title" id={id}>
       <div>
         <Icon size={20} />
       </div>
@@ -1103,7 +1111,7 @@ function Dashboard({
 
       {/* HERO */}
 
-      <div className="hero">
+      <div className="hero" id="wa-summary">
         <div>
           <span className="eyebrow">
             WHATSAPP CHAT ANALYZER
@@ -1175,6 +1183,7 @@ function Dashboard({
       {/* RESUMEN */}
 
       <SectionTitle
+        id="wa-summary-title"
         icon={BarChart3}
         title="Resumen"
         description="Las métricas principales de la conversación."
@@ -1271,7 +1280,7 @@ function Dashboard({
 
       {/* MENSAJES POR DÍA */}
 
-      <section className="panel">
+      <section className="panel" id="wa-days">
 
         <h3>
           Mensajes por día
@@ -1335,7 +1344,7 @@ function Dashboard({
 
       {/* ACTIVIDAD POR HORA */}
 
-      <section className="panel">
+      <section className="panel" id="wa-hours">
 
         <h3>
           Actividad por hora
@@ -1404,6 +1413,7 @@ function Dashboard({
       {/* USUARIOS */}
 
       <SectionTitle
+        id="wa-users"
         icon={Users}
         title="Usuarios"
         description="Comparación individual entre participantes."
@@ -1501,7 +1511,7 @@ function Dashboard({
 
       {/* PALABRAS */}
 
-      <section className="two">
+      <section className="two" id="wa-words">
 
         <section className="panel">
 
@@ -1635,7 +1645,7 @@ function Dashboard({
 
       {/* EMOJIS */}
 
-      <section className="panel">
+      <section className="panel" id="wa-emojis">
 
         <h3>
           Top emojis
@@ -1680,6 +1690,7 @@ function Dashboard({
       {/* MENSAJES MÁS LARGOS */}
 
       <SectionTitle
+        id="wa-longest"
         icon={MessageCircle}
         title="Mensajes más largos"
         description="El mensaje con mayor número de caracteres de cada participante."
@@ -2721,136 +2732,116 @@ function App() {
      APLICACIÓN
   ----------------------------------------- */
 
+  const sidebarItems = [
+    { id: "summary", label: "Resumen", subtitle: "Vista general", icon: BarChart3, target: "wa-summary" },
+    { id: "activity", label: "Actividad", subtitle: "Días y horas", icon: CalendarDays, target: "wa-days" },
+    { id: "users", label: "Participantes", subtitle: `${analysis.users.length} usuarios detectados`, icon: Users, target: "wa-users" },
+    { id: "words", label: "Palabras", subtitle: "Más repetidas", icon: Hash, target: "wa-words" },
+    { id: "emojis", label: "Emojis", subtitle: "Los más utilizados", icon: Smile, target: "wa-emojis" },
+    { id: "longest", label: "Mensajes largos", subtitle: "Momentos destacados", icon: FileText, target: "wa-longest" },
+  ];
+
+  const goToSection = (target) => {
+    setPage("dashboard");
+    setSearch(null);
+    requestAnimationFrame(() => {
+      document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
+  const pageTitle = page === "ai" ? "Análisis de IA" : "WhatsApp Analyzer";
+  const pageSubtitle = page === "ai"
+    ? "Insights generados a partir de tu conversación"
+    : `${messages.length.toLocaleString("es-ES")} mensajes · ${analysis.users.length} participantes`;
+
   return (
-    <div className="app">
-
-      <header className="topbar">
-
-        <div className="brand">
-
-          <MessageCircle
-            size={22}
-          />
-
-          <span>
-            WhatsApp Analyzer
-          </span>
-
+    <div className="app wa-app">
+      <aside className="wa-sidebar">
+        <div className="wa-sidebar-header">
+          <div className="wa-brand-mark"><MessageCircle size={22} /></div>
+          <div className="wa-brand-copy">
+            <strong>WhatsApp Analyzer</strong>
+            <span>Chat analytics</span>
+          </div>
+          <button className="wa-icon-button" title="Opciones"><Menu size={20} /></button>
         </div>
 
-
-        <div className="top-actions">
-
-          <span className="file-name">
-            {fileName}
-          </span>
-
-
-          <button
-            onClick={() =>
-              setPage(
-                "dashboard"
-              )
-            }
-            className={
-              page ===
-              "dashboard"
-                ? "nav-active"
-                : ""
-            }
-          >
-            <BarChart3
-              size={16}
-            />
-
-            Análisis
-          </button>
-
-
-          <button
-            onClick={() =>
-              setPage("ai")
-            }
-            className={
-              page === "ai"
-                ? "nav-active"
-                : ""
-            }
-          >
-
-            <Sparkles
-              size={16}
-            />
-
-            IA
-
-          </button>
-
-
-          <button
-            onClick={reset}
-            className="reset-button"
-          >
-            Otro chat
-          </button>
-
+        <div className="wa-search-box">
+          <Search size={17} />
+          <span>Buscar en el análisis</span>
         </div>
 
-      </header>
+        <div className="wa-chat-card active">
+          <div className="wa-avatar analyzer-avatar"><MessageCircle size={22} /></div>
+          <div className="wa-chat-copy">
+            <div className="wa-chat-line"><strong>{fileName || "Conversación"}</strong><span>Ahora</span></div>
+            <div className="wa-chat-preview">{messages.length.toLocaleString("es-ES")} mensajes analizados</div>
+          </div>
+          <span className="wa-unread">✓</span>
+        </div>
 
+        <div className="wa-nav-label">ANÁLISIS</div>
+        <nav className="wa-nav">
+          {sidebarItems.map((item) => {
+            const Icon = item.icon;
+            const active = page === "dashboard" && item.id === "summary" && window.scrollY < 500;
+            return (
+              <button key={item.id} className={`wa-nav-item ${active ? "active" : ""}`} onClick={() => goToSection(item.target)}>
+                <span className="wa-nav-icon"><Icon size={19} /></span>
+                <span className="wa-nav-copy"><strong>{item.label}</strong><small>{item.subtitle}</small></span>
+              </button>
+            );
+          })}
+          <button className={`wa-nav-item ${page === "ai" ? "active" : ""}`} onClick={() => { setPage("ai"); setSearch(null); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+            <span className="wa-nav-icon ai-nav-icon"><Sparkles size={19} /></span>
+            <span className="wa-nav-copy"><strong>Análisis de IA</strong><small>Insights y patrones</small></span>
+          </button>
+        </nav>
 
-      {search && (
-        <MessageSearch
-          messages={messages}
-          search={search}
-          setSearch={
-            setSearch
-          }
-        />
-      )}
+        <div className="wa-sidebar-spacer" />
+        <div className="wa-sidebar-footer">
+          <div className="wa-local-note"><Database size={16} /><span>Los datos estadísticos se procesan localmente</span></div>
+          <button className="wa-new-chat" onClick={reset}><Upload size={17} /> Analizar otro chat</button>
+        </div>
+      </aside>
 
+      <section className="wa-content">
+        <header className="wa-main-header">
+          <div className="wa-mobile-menu"><Menu size={20} /></div>
+          <div className="wa-header-avatar"><Sparkles size={21} /></div>
+          <div className="wa-header-copy">
+            <strong>{pageTitle}</strong>
+            <span>{pageSubtitle}</span>
+          </div>
+          <div className="wa-header-actions">
+            <button className="wa-icon-button" title="Buscar"><Search size={20} /></button>
+            <button className="wa-icon-button" title="Ajustes"><Settings size={20} /></button>
+          </div>
+        </header>
 
-      {!search &&
-        page ===
-          "dashboard" && (
+        {search && (
+          <MessageSearch messages={messages} search={search} setSearch={setSearch} />
+        )}
+
+        {!search && page === "dashboard" && (
           <Dashboard
-            messages={
-              messages
-            }
-            users={
-              analysis.users
-            }
-            stats={
-              analysis.stats
-            }
-            setSearch={
-              setSearch
-            }
-            setPage={
-              setPage
-            }
+            messages={messages}
+            users={analysis.users}
+            stats={analysis.stats}
+            setSearch={setSearch}
+            setPage={setPage}
           />
         )}
 
-
-      {!search &&
-        page === "ai" && (
+        {!search && page === "ai" && (
           <AIPage
-            messages={
-              messages
-            }
-            rawChat={
-              rawChat
-            }
-            users={
-              analysis.users
-            }
-            stats={
-              analysis.stats
-            }
+            messages={messages}
+            rawChat={rawChat}
+            users={analysis.users}
+            stats={analysis.stats}
           />
         )}
-
+      </section>
     </div>
   );
 }
