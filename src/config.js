@@ -13,7 +13,10 @@ export const BANNED_NAMES = [
   "Eres", "Recuerda", "Lengua", "Hasta", "Las", "Quiero", "Vas", "Claro", "Esto", "Tiene","Seguro", "Supongo", "Nada", "Pap","Una","Un","Ese","Vaya","Venga","Vengan","Vengas",
   "Web","WEB","Pdf","PDF","Doc","DOC","Docx","DOCX","Png","PNG","Jpg","JPG","Jpeg","JPEG","Webp","WEBP","Gif","GIF","Mp3","MP3","Mp4","MP4","Mov","MOV","M4a","M4A","Opus","OPUS","Ptt","PTT","Vcf","VCF","Xlsx","XLSX","Csv","CSV","Zip","ZIP","Link","Links","URL","Http","Https",
   "Llegar", "Contesta","Contestaa","Contestaaa","Okk","Aaaa","A","Aa","Dejame","Déjame","Corre", "Sisi", "Ala", "Además","Gracie","Esa", "Joe", "Valeee", "Top", "Flexiones",
-  "Abdominales","Dale","Perfe","Duro","Bastante","Guay","Dile","LLamame","Del","Pásame","Pasame","Jos","Estudia"
+  "Abdominales","Dale","Perfe","Duro","Bastante","Guay","Dile","LLamame","Del","Pásame","Pasame","Jos","Estudia", "Esq", "Aunque","Aja","Nono","Ayyy","Perdón","Ayyyy","Asq","Guay","Guayy","Guayyy","Guayyyy",
+  "Ah","Ahh","Ahhh","Ahhhh","Ntp","Nou","Nouu","Nouuu","Nouuuu","Shi","Oks","Okss","Oksss","Nooo","Noooo","Jous","Jajajajajajajajajaja","Okiiis","Quieres","Okiiiis","Okiis","Okis","Estaba","Soy","Besito","Besitos"
+  ,"Haber","Jajajajajaja","Jajajajaja","Tampoco","Mejor","Siiii","Okssss","Emmmm","Emmm","Pensaba","Chi","Chii","Chiii","Era","Eran","Jajajajaj","Valeeee","Valee","Valeee","Ayyyyy","Ay","Ayy","Ayyy",
+  "Ah","Aah","Aaah","Aaaah","Amor","Exacto","Puede"
 
 ];
 
@@ -41,5 +44,5 @@ export const STOPWORDS = [
   "wa","Archivo", "Adjunto", "es", "ppt", "opus", "tu","archivo","adjunto","ptt","stk","webp",
   "img","jpg","multimedia","omitido","si","sí","youtube","shorts","he","mensaje","voy","eliminaste","has","bien","estoy","manana","mañana","Tienes","Tienen",
   "Ok","Vale","Real","Ubicacion","Ubicación","Compartida","Tiempo","prq","Porque","ir", "amzn","tal","pues", "eu", "eso", "Ahora", "Elimino",
-  "web","pdf","doc","docx","png","jpg","jpeg","gif","mp4","mp3","m4a","opus","ptt","vcf","vcard","xlsx","csv","zip","rar","link","url",
+  "web","pdf","doc","docx","png","jpg","jpeg","gif","mp4","mp3","m4a","opus","ptt","vcf","vcard","xlsx","csv","zip","rar","link","url", "ti"
 ];

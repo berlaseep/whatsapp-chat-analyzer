@@ -1,5 +1,6 @@
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import JSZip from "jszip";
 import { createRoot } from "react-dom/client";
 import {
   MessageCircle,
@@ -225,6 +226,79 @@ function formatDuration(seconds) {
   return `${Math.round(hours / 24)} días`;
 }
 
+
+/* =========================================================
+   ARCHIVOS DE WHATSAPP
+========================================================= */
+
+async function readWhatsAppFile(file) {
+  // Si es un TXT normal, lo leemos directamente
+  if (
+    file.name.toLowerCase().endsWith(".txt") ||
+    file.type === "text/plain"
+  ) {
+    return await file.text();
+  }
+
+  // Si es un ZIP, buscamos automáticamente el TXT del chat
+  if (
+    file.name.toLowerCase().endsWith(".zip") ||
+    file.type === "application/zip" ||
+    file.type === "application/x-zip-compressed"
+  ) {
+    const zip = await JSZip.loadAsync(file);
+
+    const txtFiles = Object.values(zip.files).filter(
+      (entry) =>
+        !entry.dir &&
+        entry.name.toLowerCase().endsWith(".txt")
+    );
+
+    if (!txtFiles.length) {
+      throw new Error(
+        "El ZIP no contiene ningún archivo TXT."
+      );
+    }
+
+    let chatText = null;
+
+    for (const txtFile of txtFiles) {
+      const text = await txtFile.async("text");
+
+      /*
+        Buscamos un archivo que realmente parezca
+        una exportación de WhatsApp.
+
+        Ejemplo:
+        31/08/2026, 15:30 - Juan: Hola
+      */
+
+      const looksLikeWhatsApp =
+        /\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}[,\s]/.test(text) &&
+        (
+          text.includes(" - ") ||
+          text.includes("] ")
+        );
+
+      if (looksLikeWhatsApp) {
+        chatText = text;
+        break;
+      }
+    }
+
+    if (!chatText) {
+      throw new Error(
+        "No se encontró un archivo de chat de WhatsApp válido dentro del ZIP."
+      );
+    }
+
+    return chatText;
+  }
+
+  throw new Error(
+    "Formato no compatible. Selecciona un archivo .txt o .zip."
+  );
+}
 
 /* =========================================================
    PARSER DE WHATSAPP
@@ -2301,6 +2375,7 @@ function simpleHash(text = "") {
 
 function AIPage({ messages, users, stats, rawChat }) {
   const [loading, setLoading] = useState(false);
+  const [aiProgress, setAiProgress] = useState(0);
   const storageKey = `wtsanalyzer_ai_report_${simpleHash(rawChat)}`;
   const [report, setReport] = useState(() => {
     try {
@@ -2314,11 +2389,17 @@ function AIPage({ messages, users, stats, rawChat }) {
 
   const analyze = async () => {
     setLoading(true);
+    setAiProgress(8);
     setReport(null);
     setError("");
+    const progressTimer = window.setInterval(() => {
+      setAiProgress((value) => Math.min(value + (value < 60 ? 8 : 3), 92));
+    }, 650);
 
     try {
+      setAiProgress(18);
       const statistics = buildAIPayload(messages, users, stats);
+      setAiProgress(34);
       const userList = users.length ? users.join(" y ") : "los participantes";
 
       const prompt = `
@@ -2377,12 +2458,14 @@ ${rawChat}
 --- FIN ---
 `;
 
+      setAiProgress(48);
       const response = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
       });
 
+      setAiProgress(72);
       const raw = await response.text();
       let data;
       try {
@@ -2396,11 +2479,13 @@ ${rawChat}
       }
 
       const parsed = parseAIResponse(data.text);
+      setAiProgress(100);
       setReport(parsed);
       localStorage.setItem(storageKey, JSON.stringify(parsed));
     } catch (err) {
       setError(err?.message || "No se pudo realizar el análisis.");
     } finally {
+      window.clearInterval(progressTimer);
       setLoading(false);
     }
   };
@@ -2493,9 +2578,10 @@ ${rawChat}
       {loading && (
         <section className="panel ai-loading-card">
           <div className="ai-loader"><Sparkles size={24} /></div>
-          <div>
-            <strong>Analizando tu conversación…</strong>
-            <p>Estamos leyendo patrones, contexto y estadísticas. Esto puede tardar unos segundos.</p>
+          <div className="ai-loading-main">
+            <div className="ai-loading-title"><strong>Analizando tu conversación…</strong><b>{aiProgress}%</b></div>
+            <div className="ai-progress-track"><i style={{ width: `${aiProgress}%` }} /></div>
+            <p>Procesando mensajes, patrones, contexto y estadísticas. No cierres esta pestaña.</p>
           </div>
         </section>
       )}
@@ -2532,6 +2618,29 @@ ${rawChat}
 }
 
 
+function ImportTutorial({ onClose }) {
+  return (
+    <div className="tutorial-backdrop" role="dialog" aria-modal="true" aria-label="Cómo exportar un chat">
+      <div className="tutorial-modal">
+        <div className="tutorial-header">
+          <div className="wa-brand-mark"><MessageCircle size={21} /></div>
+          <div><strong>Cómo añadir un chat</strong><span>Exporta la conversación desde WhatsApp</span></div>
+          <button className="wa-icon-button" onClick={onClose} title="Cerrar">×</button>
+        </div>
+        <div className="tutorial-body">
+          <div className="tutorial-step"><b>1</b><div><strong>Abre WhatsApp</strong><p>Entra en la conversación que quieres analizar.</p></div></div>
+          <div className="tutorial-step"><b>2</b><div><strong>Abre la información del chat</strong><p>En móvil, pulsa el nombre del contacto o grupo en la parte superior.</p></div></div>
+          <div className="tutorial-step"><b>3</b><div><strong>Elige «Exportar chat»</strong><p>Selecciona <b>Sin archivos</b> si solo quieres el historial de mensajes. Si WhatsApp genera un ZIP, también puedes subirlo directamente aquí.</p></div></div>
+          <div className="tutorial-step"><b>4</b><div><strong>Sube el archivo</strong><p>Puedes subir el <code>.txt</code> o el <code>.zip</code> generado por WhatsApp. El analizador buscará automáticamente el archivo TXT del chat dentro del ZIP, sin importar cómo se llame.</p></div></div>
+          <div className="tutorial-tip"><strong>🔒 Privacidad</strong><span>Las estadísticas se calculan en tu dispositivo. El chat solo se envía al servidor cuando utilizas el análisis de IA.</span></div>
+        </div>
+        <button className="tutorial-close" onClick={onClose}>Entendido</button>
+      </div>
+    </div>
+  );
+}
+
+
 /* =========================================================
    APP
 ========================================================= */
@@ -2552,6 +2661,9 @@ function App() {
 
   const [search, setSearch] =
     useState(null);
+
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [importing, setImporting] = useState(false);
 
 
   const analysis =
@@ -2583,8 +2695,9 @@ function App() {
 
     try {
 
+      setImporting(true);
       const text =
-        await file.text();
+        await readWhatsAppFile(file);
 
       const parsed =
         parseWhatsApp(
@@ -2622,8 +2735,10 @@ function App() {
       );
 
       alert(
-        "No se pudo leer el archivo."
+        error?.message || "No se pudo leer el archivo."
       );
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -2699,11 +2814,11 @@ function App() {
 
               <Upload size={18} />
 
-              Seleccionar chat TXT
+              Seleccionar chat TXT o ZIP
 
               <input
                 type="file"
-                accept=".txt,text/plain"
+                accept=".txt,.zip,text/plain,application/zip"
                 onChange={
                   handleFile
                 }
@@ -2713,15 +2828,26 @@ function App() {
             </label>
 
 
+            <button className="tutorial-link" onClick={() => setShowTutorial(true)}>
+              ¿Cómo exporto mi chat? · Ver tutorial
+            </button>
+
             <small>
-              El análisis estadístico se
-              realiza localmente en tu
-              dispositivo.
+              El análisis estadístico se realiza localmente en tu dispositivo.
             </small>
+
+            {importing && (
+              <div className="import-progress" aria-live="polite">
+                <div className="import-progress-track"><i /></div>
+                <span>Importando y preparando la conversación…</span>
+              </div>
+            )}
 
           </div>
 
         </main>
+
+        {showTutorial && <ImportTutorial onClose={() => setShowTutorial(false)} />}
 
       </div>
     );
@@ -2771,32 +2897,34 @@ function App() {
           <span>Buscar en el análisis</span>
         </div>
 
-        <div className="wa-chat-card active">
-          <div className="wa-avatar analyzer-avatar"><MessageCircle size={22} /></div>
-          <div className="wa-chat-copy">
-            <div className="wa-chat-line"><strong>{fileName || "Conversación"}</strong><span>Ahora</span></div>
-            <div className="wa-chat-preview">{messages.length.toLocaleString("es-ES")} mensajes analizados</div>
+        <div className="wa-chat-list">
+          <div className="wa-chat-card active">
+            <div className="wa-avatar analyzer-avatar"><MessageCircle size={22} /></div>
+            <div className="wa-chat-copy">
+              <div className="wa-chat-line"><strong>{fileName || "Conversación"}</strong><span>Ahora</span></div>
+              <div className="wa-chat-preview">{messages.length.toLocaleString("es-ES")} mensajes · {analysis.users.length} participantes</div>
+            </div>
           </div>
-          <span className="wa-unread">✓</span>
-        </div>
 
-        <div className="wa-nav-label">ANÁLISIS</div>
-        <nav className="wa-nav">
-          {sidebarItems.map((item) => {
+          <div className="wa-section-divider"><span>ANÁLISIS DEL CHAT</span></div>
+
+          {sidebarItems.map((item, index) => {
             const Icon = item.icon;
-            const active = page === "dashboard" && item.id === "summary" && window.scrollY < 500;
+            const active = page === "dashboard" && ((index === 0 && window.scrollY < 500) || (index > 0 && false));
             return (
               <button key={item.id} className={`wa-nav-item ${active ? "active" : ""}`} onClick={() => goToSection(item.target)}>
-                <span className="wa-nav-icon"><Icon size={19} /></span>
+                <span className="wa-nav-icon"><Icon size={20} /></span>
                 <span className="wa-nav-copy"><strong>{item.label}</strong><small>{item.subtitle}</small></span>
+                {item.id === "summary" && <span className="wa-nav-check">✓</span>}
               </button>
             );
           })}
+
           <button className={`wa-nav-item ${page === "ai" ? "active" : ""}`} onClick={() => { setPage("ai"); setSearch(null); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
-            <span className="wa-nav-icon ai-nav-icon"><Sparkles size={19} /></span>
-            <span className="wa-nav-copy"><strong>Análisis de IA</strong><small>Insights y patrones</small></span>
+            <span className="wa-nav-icon ai-nav-icon"><Sparkles size={20} /></span>
+            <span className="wa-nav-copy"><strong>Análisis de IA</strong><small>Insights, patrones y señales</small></span>
           </button>
-        </nav>
+        </div>
 
         <div className="wa-sidebar-spacer" />
         <div className="wa-sidebar-footer">
