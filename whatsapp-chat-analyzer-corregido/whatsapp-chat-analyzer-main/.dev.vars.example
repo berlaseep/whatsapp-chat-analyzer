@@ -1,0 +1,3 @@
+# Copia este archivo como .dev.vars SOLO para probar Cloudflare en local.
+# Nunca subas .dev.vars a GitHub.
+GEMINI_API_KEY=PEGA_AQUI_TU_API_KEY_DE_GEMINI
