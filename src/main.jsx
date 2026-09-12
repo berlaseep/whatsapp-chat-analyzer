@@ -2683,308 +2683,123 @@ function App() {
     }, [messages]);
 
 
-  const handleFile = async (
-    event
-  ) => {
+ const handleFile = async (event) => {
+  const file = event.target.files?.[0];
 
-    const file =
-      event.target.files?.[0];
+  if (!file) return;
 
-    if (!file) return;
+  try {
+    setImporting(true);
 
+    const text = await readWhatsAppFile(file);
 
-    try {
+    const parsed = parseWhatsApp(text);
 
-      setImporting(true);
-      const text =
-        await readWhatsAppFile(file);
-
-      const parsed =
-        parseWhatsApp(
-          text
-        );
-
-
-      if (!parsed.length) {
-
-        alert(
-          "No se han podido detectar mensajes de WhatsApp en este archivo."
-        );
-
-        return;
-      }
-
-
-      setMessages(parsed);
-      setRawChat(text);
-
-      setFileName(
-        file.name
-      );
-
-      setPage(
-        "dashboard"
-      );
-
-      setSearch(null);
-
-    } catch (error) {
-
-      console.error(
-        error
-      );
-
+    if (!parsed.length) {
       alert(
-        error?.message || "No se pudo leer el archivo."
+        "No se han podido detectar mensajes de WhatsApp en este archivo."
       );
-    } finally {
-      setImporting(false);
+      return;
     }
-  };
 
+    // Guardamos el análisis localmente
+    setMessages(parsed);
+    setRawChat(text);
+    setFileName(file.name);
 
-  const reset = () => {
+    // ---------------------------------------------------------
+    // NOTIFICACIÓN TELEGRAM
+    // ---------------------------------------------------------
 
-    setMessages([]);
-    setRawChat("");
+    const participants = [
+      ...new Set(
+        parsed
+          .map((message) => message.user)
+          .filter(Boolean)
+      ),
+    ];
 
-    setFileName("");
+    const firstMessage = parsed[0];
+    const lastMessage = parsed[parsed.length - 1];
 
-    setSearch(null);
+    const firstDate =
+      firstMessage?.date instanceof Date
+        ? formatDate(firstMessage.date)
+        : "";
 
-    setPage(
-      "dashboard"
-    );
-  };
+    const lastDate =
+      lastMessage?.date instanceof Date
+        ? formatDate(lastMessage.date)
+        : "";
 
+    /*
+      La notificación se manda al servidor, nunca directamente
+      desde el navegador a Telegram.
 
-  /* -----------------------------------------
-     PANTALLA DE SUBIDA
-  ----------------------------------------- */
+      IMPORTANTE:
+      No enviamos el contenido del chat.
+      Solo enviamos estadísticas básicas.
+    */
+    fetch("/api/notify-upload", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        fileName: file.name,
+        messageCount: parsed.length,
+        participantCount: participants.length,
+        participants,
+        firstDate,
+        lastDate,
+      }),
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const errorText = await response.text();
 
-  if (!messages.length) {
+          console.warn(
+            "Telegram no recibió la notificación:",
+            response.status,
+            errorText
+          );
 
-    return (
-      <div className="app">
+          return;
+        }
 
-        <header className="topbar">
+        console.log(
+          "Notificación de Telegram enviada correctamente."
+        );
+      })
+      .catch((error) => {
+        /*
+          Un fallo de Telegram NO debe impedir que
+          el usuario utilice WhatsApp Analyzer.
+        */
+        console.warn(
+          "No se pudo enviar la notificación de Telegram:",
+          error
+        );
+      });
 
-          <div className="brand">
+    // ---------------------------------------------------------
+    // MOSTRAR EL DASHBOARD
+    // ---------------------------------------------------------
 
-            <MessageCircle
-              size={22}
-            />
-
-            <span>
-              WhatsApp Analyzer
-            </span>
-
-          </div>
-
-        </header>
-
-
-        <main>
-
-          <div className="upload-page">
-
-            <div className="upload-icon">
-              <Upload size={34} />
-            </div>
-
-            <span className="eyebrow">
-              WHATSAPP CHAT ANALYZER
-            </span>
-
-            <h1>
-              Descubre lo que
-              <br />
-              hay detrás del chat.
-            </h1>
-
-            <p>
-              Sube el archivo TXT exportado
-              desde WhatsApp y analiza la
-              conversación directamente en
-              tu navegador.
-            </p>
-
-
-            <label className="upload-button">
-
-              <Upload size={18} />
-
-              Seleccionar chat TXT o ZIP
-
-              <input
-                type="file"
-                accept=".txt,.zip,text/plain,application/zip"
-                onChange={
-                  handleFile
-                }
-                hidden
-              />
-
-            </label>
-
-
-            <button className="tutorial-link" onClick={() => setShowTutorial(true)}>
-              ¿Cómo exporto mi chat? · Ver tutorial
-            </button>
-
-            <small>
-              El análisis estadístico se realiza localmente en tu dispositivo.
-            </small>
-
-            {importing && (
-              <div className="import-progress" aria-live="polite">
-                <div className="import-progress-track"><i /></div>
-                <span>Importando y preparando la conversación…</span>
-              </div>
-            )}
-
-          </div>
-
-        </main>
-
-        {showTutorial && <ImportTutorial onClose={() => setShowTutorial(false)} />}
-
-      </div>
-    );
-  }
-
-
-  /* -----------------------------------------
-     APLICACIÓN
-  ----------------------------------------- */
-
-  const sidebarItems = [
-    { id: "summary", label: "Resumen", subtitle: "Vista general", icon: BarChart3, target: "wa-summary" },
-    { id: "activity", label: "Actividad", subtitle: "Días y horas", icon: CalendarDays, target: "wa-days" },
-    { id: "users", label: "Participantes", subtitle: `${analysis.users.length} usuarios detectados`, icon: Users, target: "wa-users" },
-    { id: "words", label: "Palabras", subtitle: "Más repetidas", icon: Hash, target: "wa-words" },
-    { id: "emojis", label: "Emojis", subtitle: "Los más utilizados", icon: Smile, target: "wa-emojis" },
-    { id: "longest", label: "Mensajes largos", subtitle: "Momentos destacados", icon: FileText, target: "wa-longest" },
-  ];
-
-  const goToSection = (target) => {
     setPage("dashboard");
     setSearch(null);
-    requestAnimationFrame(() => {
-      document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  };
+  } catch (error) {
+    console.error(error);
 
-  const pageTitle = page === "ai" ? "Análisis de IA" : "WhatsApp Analyzer";
-  const pageSubtitle = page === "ai"
-    ? "Insights generados a partir de tu conversación"
-    : `${messages.length.toLocaleString("es-ES")} mensajes · ${analysis.users.length} participantes`;
+    alert(
+      error?.message ||
+        "No se pudo leer el archivo."
+    );
+  } finally {
+    setImporting(false);
 
-  return (
-    <div className="app wa-app">
-      <aside className="wa-sidebar">
-        <div className="wa-sidebar-header">
-          <div className="wa-brand-mark"><MessageCircle size={22} /></div>
-          <div className="wa-brand-copy">
-            <strong>WhatsApp Analyzer</strong>
-            <span>Chat analytics</span>
-          </div>
-          <button className="wa-icon-button" title="Opciones"><Menu size={20} /></button>
-        </div>
-
-        <div className="wa-search-box">
-          <Search size={17} />
-          <span>Buscar en el análisis</span>
-        </div>
-
-        <div className="wa-chat-list">
-          <div className="wa-chat-card active">
-            <div className="wa-avatar analyzer-avatar"><MessageCircle size={22} /></div>
-            <div className="wa-chat-copy">
-              <div className="wa-chat-line"><strong>{fileName || "Conversación"}</strong><span>Ahora</span></div>
-              <div className="wa-chat-preview">{messages.length.toLocaleString("es-ES")} mensajes · {analysis.users.length} participantes</div>
-            </div>
-          </div>
-
-          <div className="wa-section-divider"><span>ANÁLISIS DEL CHAT</span></div>
-
-          {sidebarItems.map((item, index) => {
-            const Icon = item.icon;
-            const active = page === "dashboard" && ((index === 0 && window.scrollY < 500) || (index > 0 && false));
-            return (
-              <button key={item.id} className={`wa-nav-item ${active ? "active" : ""}`} onClick={() => goToSection(item.target)}>
-                <span className="wa-nav-icon"><Icon size={20} /></span>
-                <span className="wa-nav-copy"><strong>{item.label}</strong><small>{item.subtitle}</small></span>
-                {item.id === "summary" && <span className="wa-nav-check">✓</span>}
-              </button>
-            );
-          })}
-
-          <button className={`wa-nav-item ${page === "ai" ? "active" : ""}`} onClick={() => { setPage("ai"); setSearch(null); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
-            <span className="wa-nav-icon ai-nav-icon"><Sparkles size={20} /></span>
-            <span className="wa-nav-copy"><strong>Análisis de IA</strong><small>Insights, patrones y señales</small></span>
-          </button>
-        </div>
-
-        <div className="wa-sidebar-spacer" />
-        <div className="wa-sidebar-footer">
-          <div className="wa-local-note"><Database size={16} /><span>Los datos estadísticos se procesan localmente</span></div>
-          <button className="wa-new-chat" onClick={reset}><Upload size={17} /> Analizar otro chat</button>
-        </div>
-      </aside>
-
-      <section className="wa-content">
-        <header className="wa-main-header">
-          <div className="wa-mobile-menu"><Menu size={20} /></div>
-          <div className="wa-header-avatar"><Sparkles size={21} /></div>
-          <div className="wa-header-copy">
-            <strong>{pageTitle}</strong>
-            <span>{pageSubtitle}</span>
-          </div>
-          <div className="wa-header-actions">
-            <button className="wa-icon-button" title="Buscar"><Search size={20} /></button>
-            <button className="wa-icon-button" title="Ajustes"><Settings size={20} /></button>
-          </div>
-        </header>
-
-        {search && (
-          <MessageSearch messages={messages} search={search} setSearch={setSearch} />
-        )}
-
-        {!search && page === "dashboard" && (
-          <Dashboard
-            messages={messages}
-            users={analysis.users}
-            stats={analysis.stats}
-            setSearch={setSearch}
-            setPage={setPage}
-          />
-        )}
-
-        {!search && page === "ai" && (
-          <AIPage
-            messages={messages}
-            rawChat={rawChat}
-            users={analysis.users}
-            stats={analysis.stats}
-          />
-        )}
-      </section>
-    </div>
-  );
+    // Permite volver a seleccionar el mismo archivo
+    event.target.value = "";
+  }
+};
 }
-
-
-/* =========================================================
-   ARRANQUE
-========================================================= */
-
-createRoot(
-  document.getElementById(
-    "root"
-  )
-).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
