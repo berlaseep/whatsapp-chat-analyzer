@@ -1,8 +1,0 @@
-# Copia este archivo como .dev.vars SOLO para probar Cloudflare en local.
-# Nunca subas .dev.vars a GitHub.
-GEMINI_API_KEY=PEGA_AQUI_TU_API_KEY_DE_GEMINI
-
-
-# Telegram notifications
-TELEGRAM_BOT_TOKEN=PEGA_AQUI_EL_TOKEN_DEL_BOT
-TELEGRAM_ADMIN_CHAT_ID=PEGA_AQUI_EL_CHAT_ID
