@@ -1,51 +1,77 @@
 export async function onRequestPost({ request, env }) {
-  const json = (data, status = 200) =>
-    new Response(JSON.stringify(data), {
-      status,
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "no-store",
-      },
-    });
-
   try {
     if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_ADMIN_CHAT_ID) {
-      console.error("Telegram secrets missing.");
-      return json(
-        { success: false, error: "Telegram no está configurado en el servidor." },
-        500
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Telegram no está configurado en el servidor.",
+        }),
+        {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
       );
     }
 
     const body = await request.json();
 
-    const messageCount = Number(body?.messageCount);
-    const participantCount = Number(body?.participantCount);
+    const {
+      fileName,
+      messageCount,
+      participantCount,
+      participants,
+      firstDate,
+      lastDate,
+    } = body || {};
 
-    if (
-      !Number.isFinite(messageCount) ||
-      messageCount < 1 ||
-      !Number.isFinite(participantCount) ||
-      participantCount < 1
-    ) {
-      return json(
-        { success: false, error: "Datos de análisis incompletos." },
-        400
+    if (!messageCount || !participantCount) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Datos de análisis incompletos.",
+        }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
       );
     }
 
-    const fileName = clean(body?.fileName, 120) || "Sin nombre";
-    const firstDate = clean(body?.firstDate, 40);
-    const lastDate = clean(body?.lastDate, 40);
+    const safeFileName = String(fileName || "Sin nombre")
+      .replace(/[\r\n]/g, " ")
+      .slice(0, 120);
+
+    const safeParticipants = Array.isArray(participants)
+      ? participants
+          .map((name) =>
+            String(name)
+              .replace(/[\r\n]/g, " ")
+              .slice(0, 80)
+          )
+          .slice(0, 10)
+      : [];
 
     const text = [
       "📥 <b>Nuevo chat analizado</b>",
       "",
-      `📄 <b>Archivo:</b> ${escapeHtml(fileName)}`,
-      `💬 <b>Mensajes:</b> ${messageCount.toLocaleString("es-ES")}`,
-      `👥 <b>Participantes:</b> ${participantCount}`,
-      firstDate ? `📅 <b>Inicio:</b> ${escapeHtml(firstDate)}` : "",
-      lastDate ? `📅 <b>Fin:</b> ${escapeHtml(lastDate)}` : "",
+      `📄 <b>Archivo:</b> ${escapeHtml(safeFileName)}`,
+      `💬 <b>Mensajes:</b> ${Number(messageCount).toLocaleString("es-ES")}`,
+      `👥 <b>Participantes:</b> ${Number(participantCount)}`,
+      safeParticipants.length
+        ? `🧑‍🤝‍🧑 <b>Nombres:</b> ${safeParticipants
+            .map(escapeHtml)
+            .join(", ")}`
+        : "",
+      firstDate
+        ? `📅 <b>Inicio:</b> ${escapeHtml(firstDate)}`
+        : "",
+      lastDate
+        ? `📅 <b>Fin:</b> ${escapeHtml(lastDate)}`
+        : "",
       "",
       "🔒 <i>No se ha enviado el contenido del chat.</i>",
     ]
@@ -56,12 +82,13 @@ export async function onRequestPost({ request, env }) {
       `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           chat_id: env.TELEGRAM_ADMIN_CHAT_ID,
           text,
           parse_mode: "HTML",
-          disable_web_page_preview: true,
         }),
       }
     );
@@ -69,32 +96,55 @@ export async function onRequestPost({ request, env }) {
     const telegramData = await telegramResponse.json();
 
     if (!telegramResponse.ok || !telegramData.ok) {
-      console.error("Telegram sendMessage failed:", telegramData);
-      return json(
-        {
+      console.error(
+        "Error enviando notificación a Telegram:",
+        telegramData
+      );
+
+      return new Response(
+        JSON.stringify({
           success: false,
           error: "Telegram rechazó el mensaje.",
-          telegramError: telegramData?.description || null,
-        },
-        502
+        }),
+        {
+          status: 502,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
       );
     }
 
-    return json({ success: true });
+    return new Response(
+      JSON.stringify({
+        success: true,
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
   } catch (error) {
-    console.error("Error en /api/notify-upload:", error);
-    return json(
-      { success: false, error: "Error interno al enviar la notificación." },
-      500
+    console.error(
+      "Error en /api/notify-upload:",
+      error
+    );
+
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Error interno al enviar la notificación.",
+      }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
     );
   }
-}
-
-function clean(value, maxLength) {
-  return String(value ?? "")
-    .replace(/[\r\n]+/g, " ")
-    .trim()
-    .slice(0, maxLength);
 }
 
 function escapeHtml(value = "") {

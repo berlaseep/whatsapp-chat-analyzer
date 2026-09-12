@@ -20,11 +20,17 @@ For a local Cloudflare-style deployment, use Wrangler after installing it with `
 The frontend is built to `dist/`. The Worker serves those assets and handles `/api/ai` and `/api/health`.
 
 
-## Telegram upload notifications
-The Worker can notify the configured administrator when a WhatsApp chat is uploaded. The chat content is not sent to Telegram; only aggregate metadata is sent.
+## Notificaciones de Telegram
 
-Add these encrypted Worker secrets in **Workers > Settings > Variables and Secrets**:
+El frontend notifica cada subida mediante `POST /api/notify-upload`. Solo se envian estadisticas agregadas; no se envia el contenido del chat.
+
+Configura como Secrets del Worker:
+
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_ADMIN_CHAT_ID`
 
-The notification endpoint is `POST /api/notify-upload`. A `GET` request reports whether both Telegram variables are present without exposing their values.
+Puedes comprobar que el endpoint desplegado esta activo abriendo:
+
+`/api/notify-upload`
+
+Debe responder JSON con `endpoint: "/api/notify-upload"`. Si aparece la web de la aplicacion, el Worker nuevo no esta desplegado.

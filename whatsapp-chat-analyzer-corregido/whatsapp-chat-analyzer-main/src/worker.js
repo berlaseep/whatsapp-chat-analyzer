@@ -69,17 +69,20 @@ export default {
     // ---------------------------------------------------------
 
     if (url.pathname === "/api/notify-upload") {
-      if (request.method === "POST") {
-        return onNotifyUploadPost({ request, env, ctx });
-      }
-
+      // GET is intentionally a diagnostic endpoint. It must return JSON
+      // instead of falling through to the SPA, so deployment can be tested
+      // directly from a browser.
       if (request.method === "GET") {
         return new Response(
           JSON.stringify({
             ok: true,
+            endpoint: "/api/notify-upload",
+            method: "POST",
             telegramConfigured: Boolean(
-              env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_ADMIN_CHAT_ID
+              env.TELEGRAM_BOT_TOKEN &&
+              env.TELEGRAM_ADMIN_CHAT_ID
             ),
+            message: "Endpoint activo. Usa POST para enviar una notificación."
           }),
           {
             status: 200,
@@ -91,10 +94,27 @@ export default {
         );
       }
 
-      return new Response("Method Not Allowed", {
-        status: 405,
-        headers: { Allow: "GET, POST" },
-      });
+      if (request.method === "POST") {
+        return onNotifyUploadPost({
+          request,
+          env,
+          ctx,
+        });
+      }
+
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: "Method Not Allowed",
+        }),
+        {
+          status: 405,
+          headers: {
+            Allow: "GET, POST",
+            "Content-Type": "application/json; charset=utf-8",
+          },
+        }
+      );
     }
 
     // ---------------------------------------------------------

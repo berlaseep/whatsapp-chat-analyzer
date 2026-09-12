@@ -2749,35 +2749,35 @@ function App() {
         fileName: file.name,
         messageCount: parsed.length,
         participantCount: participants.length,
+        participants,
         firstDate,
         lastDate,
       }),
     })
       .then(async (response) => {
-        let data = null;
+        if (!response.ok) {
+          const errorText = await response.text();
 
-        try {
-          data = await response.json();
-        } catch {
-          // El servidor puede devolver texto si algo falla antes del JSON.
-        }
-
-        if (!response.ok || !data?.success) {
           console.warn(
-            "No se pudo enviar la notificación a Telegram:",
+            "Telegram no recibió la notificación:",
             response.status,
-            data?.error || "Respuesta no válida del servidor",
-            data?.telegramError || ""
+            errorText
           );
+
           return;
         }
 
-        console.log("Notificación de Telegram enviada correctamente.");
+        console.log(
+          "Notificación de Telegram enviada correctamente."
+        );
       })
       .catch((error) => {
-        // Telegram nunca debe impedir el uso normal del analizador.
+        /*
+          Un fallo de Telegram NO debe impedir que
+          el usuario utilice WhatsApp Analyzer.
+        */
         console.warn(
-          "No se pudo conectar con /api/notify-upload:",
+          "No se pudo enviar la notificación de Telegram:",
           error
         );
       });
