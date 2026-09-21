@@ -11,6 +11,10 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
+import {
+  onRequestGet as onTelegramTestGet,
+} from "../functions/api/telegram-test.js";
+    
     // ---------------------------------------------------------
     // HEALTH CHECK
     // ---------------------------------------------------------
@@ -117,6 +121,25 @@ export default {
       );
     }
 
+
+
+    // ---------------------------------------------------------
+    // PRUEBA TELEGRAM
+    // ---------------------------------------------------------
+
+    if (
+      url.pathname === "/api/telegram-test" &&
+      request.method === "GET"
+    ) {
+      return onTelegramTestGet({
+        request,
+        env,
+        ctx,
+      });
+    }
+
+
+    
     // ---------------------------------------------------------
     // FRONTEND
     // ---------------------------------------------------------
