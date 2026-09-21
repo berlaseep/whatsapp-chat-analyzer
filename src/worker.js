@@ -7,10 +7,6 @@ import {
   onRequestPost as onNotifyUploadPost,
 } from "../functions/api/notify-upload.js";
 
-export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-
 import {
   onRequestGet as onTelegramTestGet,
 } from "../functions/api/telegram-test.js";
